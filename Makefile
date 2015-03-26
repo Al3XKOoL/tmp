@@ -378,13 +378,6 @@ KBUILD_AFLAGS_MODULE  := -DMODULE
 KBUILD_CFLAGS_MODULE  := -DMODULE
 KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 
--include $(srctree)/$(MTK_PROJECT)_mtk_cust.mak
-#MTK_INC += -I$(MTK_ROOT_CUSTOM)/$(MTK_PROJECT)/common
-LINUXINCLUDE	+= $(MTK_INC)
-KBUILD_CFLAGS	+= $(MTK_CFLAGS) $(MTK_CDEFS)
-KBUILD_CPPFLAGS	+= $(MTK_CPPFLAGS) $(MTK_CPPDEFS)
-KBUILD_AFLAGS   += $(MTK_AFLAGS) $(MTK_ADEFS)
-
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
 KERNELRELEASE = $(shell cat include/config/kernel.release 2> /dev/null)
 KERNELVERSION = $(VERSION)$(if $(PATCHLEVEL),.$(PATCHLEVEL)$(if $(SUBLEVEL),.$(SUBLEVEL)))$(EXTRAVERSION)
@@ -532,14 +525,7 @@ ifeq ($(KBUILD_EXTMOD),)
 -include include/config/auto.conf.cmd
 
 # To avoid any implicit rule to kick in, define an empty command
-ifneq ($(SRCARCH),arm)
 $(KCONFIG_CONFIG) include/config/auto.conf.cmd: ;
-else
-#TODO { 
-#modify by MTK, we have the .config rule, don't set the empty command rule for .config
-include/config/auto.conf.cmd: ;
-# }
-endif
 
 # If .config is newer than include/config/auto.conf, someone tinkered
 # with it and forgot to run make oldconfig.
@@ -1023,7 +1009,6 @@ define filechk_utsrelease.h
 	  exit 1;                                                         \
 	fi;                                                               \
 	(echo \#define UTS_RELEASE \"$(KERNELRELEASE)\";                  \
-	echo \#define BUILD_INFO \"$(MTK_BUILD_VERNO)\";                  \
 	echo \#define BUILD_FINGERPRINT \"$(TARGET_PRODUCT)\";)
 endef
 
@@ -1160,7 +1145,7 @@ _modinst_post: _modinst_
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.fwinst obj=firmware __fw_modinst
 	$(call cmd,depmod)
 
-# MTK, Infinity, 20090730 {
+# MTK
 # Target to install android modules
 
 AMODLIB	= $(INSTALL_MOD_PATH)/lib/modules
@@ -1180,7 +1165,7 @@ _android_modinst_:
 	   mkdir -p $(AMODSYMLIB); \
 	fi
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.android.modinst
-# MTK, Infinity, 20090730 }
+# MTK
 
 else # CONFIG_MODULES
 
