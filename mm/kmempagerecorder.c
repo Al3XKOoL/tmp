@@ -1,3 +1,17 @@
+/*
+* Copyright (C) 2011-2014 MediaTek Inc.
+* 
+* This program is free software: you can redistribute it and/or modify it under the terms of the 
+* GNU General Public License version 2 as published by the Free Software Foundation.
+* 
+* This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+* without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+* See the GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License along with this program.
+* If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include <linux/init.h>
 #include <linux/kmempagerecorder.h>
 #include <linux/seq_file.h>
@@ -58,8 +72,6 @@ spinlock_t page_record_lock;
 spinlock_t bt_record_lock;
 spinlock_t symbol_record_lock;
 int page_recorder_debug = DEBUG_DEFAULT_FLAGS;
-unsigned int page_recorder_memory_usage = 0;
-unsigned int page_recorder_limit = 524288;
 static char page_recorder_debug_function;
 
 static int page_recorder_debug_show(struct seq_file *s, void *unused);
@@ -209,7 +221,7 @@ static unsigned int get_kernel_backtrace(unsigned long *backtrace,unsigned int d
 			for(i= 0 ; i < trace.nr_entries; i++)
 			{
 				sprint_symbol(tmp,trace.entries[i]);
-				//printk("[%d] 0x%x %s\n",i,(unsigned int)trace.entries[i],tmp);
+				printk("[%d] 0x%x %s\n",i,(unsigned int)trace.entries[i],tmp);
 			}
 		}
 		else
@@ -274,11 +286,11 @@ static void *allocate_record(unsigned int type)
 		{
 			if(!page_cache_created)
 			{
-				page_cachep = kmem_cache_create("page_record",sizeof(PageHashEntry),0,SLAB_NO_DEBUG,NULL);
+				page_cachep = kmem_cache_create("page_record",sizeof(PageHashEntry),0,SLAB_HWCACHE_ALIGN,NULL);
 				page_cache_created = true;
 			}
 			//if system ram < 2G, page_record_total should less than 524288
-			if((page_cachep != NULL) && (page_record_total < page_recorder_limit ))
+			if((page_cachep != NULL) && (page_record_total < 524288 ))
 			{
 				void *tmp = NULL;
 				tmp  = (void *)kmem_cache_alloc(page_cachep,GFP_KERNEL);
@@ -327,11 +339,6 @@ static void *get_record(unsigned int type, page_record_t *param)
 					if(bt_record_total < 50412)
 					{
 						entry = kmalloc(sizeof(PageObjectEntry)+(20 * sizeof(unsigned int)),GFP_KERNEL);
-						if(entry == NULL)
-						{
-							printk( "[PAGE_RECORDER]Error!!! can't get memory from kmalloc\n");
-							return NULL;
-						}
 					}
 					else
 					{
@@ -341,7 +348,7 @@ static void *get_record(unsigned int type, page_record_t *param)
 					//kmalloc can't get right memory space when booting
 					if((unsigned int)entry < 0xC0000000)
 					{
-						//printk("[BAKCTRACEINFO][allocate bt mem] entry (0x%x) drop address \n",(unsigned int)entry);
+						printk("[BAKCTRACEINFO][allocate bt mem] entry (0x%x) drop address \n",(unsigned int)entry);
 						return NULL;
 					}
 					entry->reference = 1;
@@ -383,11 +390,6 @@ static void *get_record(unsigned int type, page_record_t *param)
 				{
 					spin_unlock_irqrestore(&symbol_record_lock,flags);
 					entry = kmalloc(sizeof(PageObjectEntry)+(param->backtrace_num * sizeof(unsigned int)),GFP_KERNEL);
-					if(entry == NULL)
-					{
-						printk( "[PAGE_RECORDER]Error!!! can't get memory from kmalloc\n");
-						return NULL;
-					}
 					entry->reference = 1;
 					entry->prev = NULL;
 					entry->slot = slot;
@@ -464,15 +466,13 @@ PageHashEntry* record_page_info(PageObjectEntry* bt_entry,PageObjectEntry* map_e
 		page_record_max = page_record_total;
 	}
 	page_record_count++;
-	if(page_record_count >= 1000)
-        {
-                page_recorder_memory_usage = page_record_total*sizeof(PageHashEntry) + bt_record_total*(sizeof(PageObjectEntry)+(20 * sizeof(unsigned int)));
-                //printk("[TOTAL PAGE RECORD !!!] page record size is %d max page record size is %d\n",page_record_total*sizeof(PageHashEntry),page_record_max*sizeof(PageHashEntry));
-                //printk("[TOTAL BACKTRACE RECORD !!!] bt record size is %d max bt record size is %d\n",bt_record_total*(sizeof(PageObjectEntry)+(20 * sizeof(unsigned int))),bt_record_max*(sizeof(PageObjectEntry)+(20 * sizeof(unsigned int))));
-                page_record_count = 0;
-        }
-
 	spin_unlock_irqrestore(&page_record_lock,flags);
+	if(page_record_count >= 1000)
+	{
+		printk("[TOTAL PAGE RECORD !!!] page record size is %d max page record size is %d\n",page_record_total*sizeof(PageHashEntry),page_record_max*sizeof(PageHashEntry));
+		printk("[TOTAL BACKTRACE RECORD !!!] bt record size is %d max bt record size is %d\n",bt_record_total*(sizeof(PageObjectEntry)+(20 * sizeof(unsigned int))),bt_record_max*(sizeof(PageObjectEntry)+(20 * sizeof(unsigned int))));
+		page_record_count = 0;
+	}
 	return entry;
 }
 
@@ -607,12 +607,11 @@ int record_page_record(void *page, unsigned int order)
 	}
 	if(debug_log & 1)
 	{
-		//get_kernel_backtrace(NULL,1);
+		get_kernel_backtrace(NULL,1);
 	}
 	record_param.page = page;
 	record_param.size = order;
 	record_param.backtrace_num = (unsigned int)get_kernel_backtrace((unsigned long *)record_param.backtrace,(unsigned int)0);
-
 	entry = get_record(HASH_PAGE_NODE_KERNEL_PAGE_ALLOC_BACKTRACE,&record_param);
 	if (entry == NULL)
 	{
@@ -639,7 +638,7 @@ int remove_page_record(void *page, unsigned int order)
 	//get_kernel_symbol((unsigned long *)record_param.backtrace,record_param.backtrace_num,&(record_param.kernel_symbol[0]));
 	if(debug_log & 2)
 	{
-		//get_kernel_backtrace(NULL,1);
+		get_kernel_backtrace(NULL,1);
 	}
 
 	remove_page_info(record_param.page,record_param.size);
@@ -657,120 +656,88 @@ static int page_recorder_debug_show(struct seq_file *s, void *unused)
 	struct page_object_rank_entry *rank_head = NULL;
 	struct page_object_rank_entry *rank_tail = NULL;
 	unsigned int Object_rank_count = 0;
-	PageObjectEntry *tmp = NULL;
-	unsigned long flags;
 
-	seq_printf(s, "page_recorder_debug: [%d]\n", page_recorder_debug);
-	seq_printf(s, "page_recorder_limit: [%d]\n", page_recorder_limit);
 	seq_printf(s, "TOP %d page allocation \n", Object_rank_max);
 	for(index = 0 ;index < OBJECT_TABLE_SIZE;index++)
 	{
-		tmp = NULL;
-		spin_lock_irqsave(&bt_record_lock,flags);
-		tmp = gKernelPageBtTable.slots[index];
-		while(tmp != NULL)
+		if(gKernelPageBtTable.slots[index] != NULL)
 		{
-			struct page_object_rank_entry *rank_tmp = rank_head;
-			struct page_object_rank_entry *rank_tmp_prev = rank_head;
-			for(rank_index = 0;rank_index < Object_rank_max;rank_index++)
+			PageObjectEntry *tmp = gKernelPageBtTable.slots[index];
+			while(tmp != NULL)
 			{
-				struct page_object_rank_entry *new_rank_entry = NULL;
-				PageObjectEntry *entry = NULL;
-				if((rank_tmp!= NULL)&&(rank_tmp->entry->size <= tmp->size))
+				struct page_object_rank_entry *rank_tmp = rank_head;
+				struct page_object_rank_entry *rank_tmp_prev = rank_head;
+				for(rank_index = 0;rank_index < Object_rank_max;rank_index++)
 				{
-					//insert current record into list
-					PageObjectEntry *entry = NULL;
-					new_rank_entry = (struct page_object_rank_entry *)kmalloc(sizeof(struct page_object_rank_entry),GFP_ATOMIC);	
-					if(new_rank_entry == NULL)
+					if(rank_tmp!= NULL)
 					{
-						spin_unlock_irqrestore(&bt_record_lock,flags);
-						printk( "[PAGE_RECORDER]Error!!! can't get memory from kmalloc\n");
-						return NULL;
-					}
-					entry = kmalloc(sizeof(PageObjectEntry)+(20 * sizeof(unsigned int)),GFP_ATOMIC);
-					if(entry == NULL)
-					{
-						spin_unlock_irqrestore(&bt_record_lock,flags);
-						printk("[PAGE_RECORDER]Error!!! can't get memory from kmalloc\n");
-						return NULL;	
-					}
-					memcpy(entry,tmp, sizeof(PageObjectEntry)+(20 * sizeof(unsigned int)));
-					new_rank_entry->entry = entry;
-					new_rank_entry->prev = rank_tmp->prev;
-					if(rank_tmp->prev != NULL)
-					{
-						rank_tmp->prev->next = new_rank_entry;		
-					}
-					rank_tmp->prev = new_rank_entry;
-					new_rank_entry->next = rank_tmp;
-					if(new_rank_entry->prev == NULL)
-					{
-						rank_head = new_rank_entry;	
-					}	
-					if(Object_rank_count < (Object_rank_max))
-					{
-						Object_rank_count++;	
-					}
-					else
-					{
-						//free last rank_entry
-						if(rank_tail != NULL)
+						if(rank_tmp->entry->size <= tmp->size)
 						{
-							struct page_object_rank_entry *new_tail = NULL;
-							new_tail = rank_tail->prev;
-							rank_tail->prev->next = NULL;
-							kfree(rank_tail->entry);
-							kfree(rank_tail);
-							rank_tail = new_tail;	
-						}
-						else
+							//insert current record into list
+							struct page_object_rank_entry *new_rank_entry = NULL;
+							new_rank_entry = (struct page_object_rank_entry *)kmalloc(sizeof(struct page_object_rank_entry),GFP_KERNEL);	
+							new_rank_entry->entry = tmp;
+							new_rank_entry->prev = rank_tmp->prev;
+							if(rank_tmp->prev != NULL)
+							{
+								rank_tmp->prev->next = new_rank_entry;		
+							}
+							rank_tmp->prev = new_rank_entry;
+							new_rank_entry->next = rank_tmp;
+							if(new_rank_entry->prev == NULL)
+							{
+								rank_head = new_rank_entry;	
+							}	
+							if(Object_rank_count < (Object_rank_max))
+							{
+								Object_rank_count++;	
+							}
+							else
+							{
+								//free last rank_entry
+								if(rank_tail != NULL)
+								{
+									struct page_object_rank_entry *new_tail = NULL;
+									new_tail = rank_tail->prev;
+									rank_tail->prev->next = NULL;
+									kfree(rank_tail);
+									rank_tail = new_tail;	
+								}
+								else
+								{
+									printk("ERROR!!! rank_tail is NULL\n");
+								}
+							}
+							break;
+						} 
+					}
+					else if((rank_tmp == NULL)&& (Object_rank_count < Object_rank_max))
+					{
+						//if rank entry is less than object_entry_max, create new rank entry and insert it in rank list
+						struct page_object_rank_entry *new_rank_entry = NULL;
+						new_rank_entry = (struct page_object_rank_entry *)kmalloc(sizeof(struct page_object_rank_entry),GFP_KERNEL);
+						new_rank_entry->entry = tmp;
+						new_rank_entry->next = NULL;
+						new_rank_entry->prev = rank_tmp_prev;
+						if(rank_tmp_prev != NULL)
 						{
-							printk("ERROR!!! rank_tail is NULL\n");
+							rank_tmp_prev->next = new_rank_entry;
 						}
+						if(new_rank_entry->prev == NULL)
+						{
+							rank_head = new_rank_entry;
+						}
+						rank_tail = new_rank_entry;
+						Object_rank_count++;
+						break;		
 					}
-					break;
+					rank_tmp_prev = rank_tmp;
+					rank_tmp = rank_tmp->next; 	
 				}
-				else if((rank_tmp == NULL)&& (Object_rank_count < Object_rank_max))
-				{
-					//if rank entry is less than object_entry_max, create new rank entry and insert it in rank list
-					new_rank_entry = (struct page_object_rank_entry *)kmalloc(sizeof(struct page_object_rank_entry),GFP_ATOMIC);
-					if(new_rank_entry == NULL)
-					{
-						spin_unlock_irqrestore(&bt_record_lock,flags);
-						printk( "[PAGE_RECORDER]Error!!! can't get memory from kmalloc\n");
-						return NULL;
-					}
-					entry = kmalloc(sizeof(PageObjectEntry)+(20 * sizeof(unsigned int)),GFP_ATOMIC);
-					if(entry == NULL)
-					{
-						spin_unlock_irqrestore(&bt_record_lock,flags);
-						printk("[PAGE_RECORDER]Error!!! can't get memory from kmalloc\n");
-						return NULL;
-					}
-					memcpy(entry,tmp, sizeof(PageObjectEntry)+(20 * sizeof(unsigned int)));
-					new_rank_entry->entry = entry;
-					new_rank_entry->next = NULL;
-					new_rank_entry->prev = rank_tmp_prev;
-					if(rank_tmp_prev != NULL)
-					{
-						rank_tmp_prev->next = new_rank_entry;
-					}
-					if(new_rank_entry->prev == NULL)
-					{
-						rank_head = new_rank_entry;
-					}
-					rank_tail = new_rank_entry;
-					Object_rank_count++;
-					break;		
-				}
-				rank_tmp_prev = rank_tmp;
-				rank_tmp = rank_tmp->next; 	
+				tmp = tmp->next;
 			}
-			tmp = tmp->next;
 		}
-		spin_unlock_irqrestore(&bt_record_lock,flags);
 	}
-	
 	//print top object_rank_max record	
 	{
 		struct page_object_rank_entry *rank_tmp = rank_head;
@@ -788,7 +755,6 @@ static int page_recorder_debug_show(struct seq_file *s, void *unused)
 			rank_index++;
 			tmp_record = rank_tmp;
 			rank_tmp = rank_tmp->next;
-			kfree(tmp_record->entry);
 			kfree(tmp_record);
 		}
 	}
@@ -835,8 +801,6 @@ static int __init page_recorder_init(void)
 	debugfs_create_u32("page_virtual_address", 0644,debug_root, &queried_address);
 	debugfs_create_u32("debug_log", 0644,debug_root, &debug_log);
 	debugfs_create_u32("page_recorder_debug", 0644,debug_root, &page_recorder_debug);
-	debugfs_create_u32("page_recorder_memory_usage", 0644,debug_root, &page_recorder_memory_usage);
-	debugfs_create_u32("page_recorder_limit", 0644,debug_root, &page_recorder_limit);
 	return 0;
 }
 late_initcall(page_recorder_init);

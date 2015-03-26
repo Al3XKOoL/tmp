@@ -240,18 +240,13 @@ int page_group_by_mobility_disabled __read_mostly;
 
 static void set_pageblock_migratetype(struct page *page, int migratetype)
 {
+
 	if (unlikely(page_group_by_mobility_disabled))
 		migratetype = MIGRATE_UNMOVABLE;
 
 	set_pageblock_flags_group(page, (unsigned long)migratetype,
 					PB_migrate, PB_migrate_end);
 }
-#ifdef CONFIG_MTKPASR
-void __meminit set_pageblock_mobility(struct page *page, int mobility)
-{
-	set_pageblock_migratetype(page, mobility);
-}
-#endif
 
 bool oom_killer_disabled __read_mostly;
 
@@ -602,7 +597,6 @@ static inline void __free_one_page(struct page *page,
 	 * so it's less likely to be used soon and more likely to be merged
 	 * as a higher order page
 	 */
-
 	if ((order < MAX_ORDER-2) && pfn_valid_within(page_to_pfn(buddy))) {
 		struct page *higher_page, *higher_buddy;
 		combined_idx = buddy_idx & page_idx;
@@ -825,7 +819,6 @@ static inline void expand(struct zone *zone, struct page *page,
 			continue;
 		}
 #endif
-
 		list_add(&page[size].lru, &area->free_list[migratetype]);
 		area->nr_free++;
 		set_page_order(&page[size], high);
@@ -910,18 +903,10 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
  * the free lists for the desirable migrate type are depleted
  */
 static int fallbacks[MIGRATE_TYPES][MIGRATE_TYPES-1] = {
-#ifndef CONFIG_MTKPASR
 	[MIGRATE_UNMOVABLE]   = { MIGRATE_RECLAIMABLE, MIGRATE_MOVABLE,   MIGRATE_RESERVE },
 	[MIGRATE_RECLAIMABLE] = { MIGRATE_UNMOVABLE,   MIGRATE_MOVABLE,   MIGRATE_RESERVE },
 	[MIGRATE_MOVABLE]     = { MIGRATE_RECLAIMABLE, MIGRATE_UNMOVABLE, MIGRATE_RESERVE },
 	[MIGRATE_RESERVE]     = { MIGRATE_RESERVE,     MIGRATE_RESERVE,   MIGRATE_RESERVE }, /* Never used */
-#else
-	[MIGRATE_UNMOVABLE]   = { MIGRATE_RECLAIMABLE, MIGRATE_MOVABLE,     /*MIGRATE_MTKPASR,*/   MIGRATE_RESERVE },
-	[MIGRATE_RECLAIMABLE] = { MIGRATE_UNMOVABLE,   MIGRATE_MOVABLE,     /*MIGRATE_MTKPASR,*/   MIGRATE_RESERVE },
-	[MIGRATE_MOVABLE]     = { MIGRATE_MTKPASR,     MIGRATE_RECLAIMABLE, MIGRATE_UNMOVABLE, MIGRATE_RESERVE },
-	[MIGRATE_MTKPASR]     = { MIGRATE_MOVABLE,     MIGRATE_RECLAIMABLE, MIGRATE_UNMOVABLE, MIGRATE_RESERVE },
-	[MIGRATE_RESERVE]     = { MIGRATE_RESERVE }, /* Never used */
-#endif
 };
 
 /*
@@ -961,7 +946,7 @@ static int move_freepages(struct zone *zone,
 			page++;
 			continue;
 		}
-	
+
 		order = page_order(page);
 		list_move(&page->lru,
 			  &zone->free_area[order].free_list[migratetype]);
@@ -1022,18 +1007,7 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
 
 			/* MIGRATE_RESERVE handled later if necessary */
 			if (migratetype == MIGRATE_RESERVE)
-#ifndef CONFIG_MTKPASR
 				continue;
-#else
-				break;
-#endif
-
-#ifdef CONFIG_MTKPASR	/* To Check */
-			/* We can't go through fallbacks if we are in MTKPASR stage */
-			if (unlikely(current->flags & PF_MTKPASR))
-				if (migratetype == MIGRATE_MTKPASR)
-					continue;		// break -> continue
-#endif
 
 			area = &(zone->free_area[current_order]);
 			if (list_empty(&area->free_list[migratetype]))
@@ -1042,16 +1016,7 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
 			page = list_entry(area->free_list[migratetype].next,
 					struct page, lru);
 			area->nr_free--;
-#ifdef CONFIG_MTKPASR
-			/* We don't want move pages with other mobilities to MIGRATE_MTKPASR */
-			/* We don't want move pages with MIGRATE_MTKPASR to other mobilities either! */
-			if (start_migratetype == MIGRATE_MTKPASR || migratetype == MIGRATE_MTKPASR) {
-				/* Remove the page from the freelists */
-				list_del(&page->lru);
-				rmv_page_order(page);
-				goto no_move;
-			}
-#endif
+
 			/*
 			 * If breaking a large block of pages, move all free
 			 * pages to the preferred allocation list. If falling
@@ -1067,11 +1032,9 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
 
 				/* Claim the whole block if over half of it is free */
 				if (pages >= (1 << (pageblock_order-1)) ||
-						page_group_by_mobility_disabled) {
-
+						page_group_by_mobility_disabled)
 					set_pageblock_migratetype(page,
 								start_migratetype);
-				}
 
 				migratetype = start_migratetype;
 			}
@@ -1084,9 +1047,7 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
 			if (current_order >= pageblock_order)
 				change_pageblock_range(page, current_order,
 							start_migratetype);
-#ifdef CONFIG_MTKPASR
-no_move:
-#endif
+
 			expand(zone, page, order, current_order, area, migratetype);
 
 			trace_mm_page_alloc_extfrag(page, order, current_order,
@@ -1139,7 +1100,6 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 			int migratetype, int cold)
 {
 	int i;
-	int mt = migratetype;
 	
 	spin_lock(&zone->lock);
 	for (i = 0; i < count; ++i) {
@@ -1160,16 +1120,7 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 			list_add(&page->lru, list);
 		else
 			list_add_tail(&page->lru, list);
-
-#ifdef CONFIG_MTKPASR
-		mt = get_pageblock_migratetype(page);
-		/* No change on the mobility of "MIGRATE_MTKPASR" page */
-		if (mt != MIGRATE_MTKPASR && migratetype != MIGRATE_MTKPASR)
-			mt = migratetype;
-#endif
-
-		set_page_private(page, mt);
-
+		set_page_private(page, migratetype);
 		list = &page->lru;
 	}
 	__mod_zone_page_state(zone, NR_FREE_PAGES, -(i << order));
@@ -2547,6 +2498,15 @@ got_pg:
 	return page;
 
 }
+/*
+#ifndef CONFIG_PASR
+#define CONFIG_PASR
+#endif
+*/
+#if defined(CONFIG_ARM) && defined(CONFIG_PASR)
+static int buddy_is_locked = 0;
+#endif
+
 
 #ifdef CONFIG_ZRAM
 #define __LOG_PAGE_ALLOC_ORDER__
@@ -2576,6 +2536,13 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 	struct page *page = NULL;
 	int migratetype = allocflags_to_migratetype(gfp_mask);
 	unsigned int cpuset_mems_cookie;
+
+#if defined(CONFIG_ARM) && defined(CONFIG_PASR)
+	if (unlikely(buddy_is_locked)) {
+		printk(KERN_ERR"[%s] : !!!!!! Buddy is locked !!!!!!\n",__func__);
+		BUG();
+	}
+#endif
 
 	gfp_mask &= gfp_allowed_mask;
 
@@ -2611,11 +2578,7 @@ retry_cpuset:
 	if (unlikely(!page)) {
                 if (gfp_mask & __GFP_SLOWHIGHMEM) {
                         // setup highmem flag for slowhighmem
-#ifndef CONFIG_MTKPASR
                         gfp_mask |= __GFP_HIGHMEM;
-#else
-                        gfp_mask |= GFP_MTKPASR_HIGHUSER;
-#endif
                         high_zoneidx = gfp_zone(gfp_mask);
                         first_zones_zonelist(zonelist, high_zoneidx,
                                 nodemask ? : &cpuset_current_mems_allowed,
@@ -2623,24 +2586,6 @@ retry_cpuset:
                         if (!preferred_zone)
                                 goto out;
                 }
-		
-#ifdef CONFIG_MTKPASR
-		else if (gfp_mask & __GFP_WAIT) {
-			if (gfp_mask & GFP_NO_MTKPASR) {
-				/* Do nothing, just go ahead */
-			} else {
-#ifdef CONFIG_HIGHMEM
-				if (high_zoneidx == ZONE_HIGHMEM) {
-#endif
-				gfp_mask |= GFP_MTKPASR_HIGHUSER;
-				migratetype = MIGRATE_MOVABLE;
-#ifdef CONFIG_HIGHMEM
-				}
-#endif
-			}
-		}
-#endif
-
 		page = __alloc_pages_slowpath(gfp_mask, order,
 				zonelist, high_zoneidx, nodemask,
 				preferred_zone, migratetype);
@@ -4654,12 +4599,6 @@ static inline int pageblock_default_order(unsigned int order)
 
 #endif /* CONFIG_HUGETLB_PAGE_SIZE_VARIABLE */
 
-#ifdef CONFIG_MTKPASR
-extern void init_mtkpasr_range(struct zone *zone);
-#else
-#define init_mtkpasr_range(zone)	do {} while (0)
-#endif
-
 /*
  * Set up the zone data structures:
  *   - mark all pages reserved
@@ -4752,9 +4691,6 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 		memmap_init(size, nid, j, zone_start_pfn);
 		zone_start_pfn += size;
 	}
-
-	/* Initialize the imposed range of active PASR: only to create a range in HIGHMEM zone! */
-	init_mtkpasr_range(pgdat->node_zones);
 }
 
 static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
@@ -6087,70 +6023,186 @@ void dump_page(struct page *page)
 }
 EXPORT_SYMBOL(dump_page);
 
-#ifdef CONFIG_MTKPASR
-/* Find free pages - Caller must acquire zone->lock */
-int pasr_find_free_page(struct page *page, struct list_head *freelist)
-{
-	struct zone *z = page_zone(page);
-	unsigned int order;
-	int free_count, i; 
+#if defined(CONFIG_ARM) && defined(CONFIG_PASR)
 
-	/* Remove page from free list */
-	order = page_order(page);
-	list_del(&page->lru);
-	z->free_area[order].nr_free--;
-	rmv_page_order(page);
-	__mod_zone_page_state(z, NR_FREE_PAGES, -(1UL << order));
-
-	/* Split into individual pages */
-	set_page_refcounted(page);
-	split_page(page, order);
-
-	/* Add to freelist */
-	free_count = 1 << order;
-	for (i = 0; i < free_count; i++) {
-		list_add(&page->lru, freelist);
-		page++;
-	}
-
-	return free_count;
-}
-EXPORT_SYMBOL(pasr_find_free_page);
-
-/* Given an offset and return corresponding valid, inuse page */
-struct page *pasr_acquire_inuse_page(enum zone_type ztype, unsigned long which_pfn)
-{
-	struct page *page;
-
-	/* Check & Return inuse page */
-	if (pfn_valid(which_pfn)) {
-		page = pfn_to_page(which_pfn);
-		if (page_count(page) != 0) {
-			return page;
-		}
-	}
-
-	return NULL;
-}
-EXPORT_SYMBOL(pasr_acquire_inuse_page);
-
-/* Compute maximum safe order for page allocation */
-int pasr_compute_safe_order(void)
-{
-#ifdef CONFIG_HIGHMEM
-	struct zone *z = &NODE_DATA(0)->node_zones[ZONE_NORMAL];
-	int order;
-	unsigned long watermark = low_wmark_pages(z);
-	long free_pages = zone_page_state(z, NR_FREE_PAGES);
-
-	/* Start from order:1 to make system more robust */
-	for (order = 1; order < MAX_ORDER; ++order) {
-		if (!__zone_watermark_ok(z, order, (watermark + (1 << order)), 0/*ZONE_HIGHMEM*/, 0, free_pages)) {
-			return (order - 2);
-		}
-	}
+#ifndef CONFIG_PASRBANK_SIZE
+const unsigned long pasrbank_size = 0x8000000;	/* 128MB */
+#else
+const unsigned long pasrbank_size = CONFIG_PASRBANK_SIZE;
 #endif
-	return (MAX_ORDER - 1);
+static unsigned long pasrbank_pfn;
+static unsigned long pasrbank_bn;
+
+/*
+ * * Return value : an u32 bitmap 				
+ * *                1 bit denotes a pasr bank 			
+ * *                1b means free bank, 0b means in-use bank 
+ * * Ex. 10b means						
+ * *     0x0 ~ 0x07FFFFFF in-use, 0x08000000 ~ 0x0FFFFFFF free
+ *
+ * * Input : lock_buddy, indicate we won't use buddy system after calling this function.
+ *
+ * * Note : It is forbidden to access buddy system after calling this function with "lock_buddy != 0". 
+ *
+ *    0     128    256    384     512    640
+ *    _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+ *   |      |      |      |      |      |
+ *   |In-Use|      |      |      |      |  ... ...
+ *   |_ _ _ |_ _ _ |_ _ _ |_ _ _ |_ _ _ |_ _
+ *    bit0   bit1   bit2   bit3   bit4   bit5
+*/
+u32 enter_passive_pasr(int lock_buddy)
+{
+	struct zone *z;
+	int cpu;
+	unsigned long flags;
+	unsigned long start_pfn;
+	unsigned long end_pfn = NODE_DATA(0)->node_start_pfn + NODE_DATA(0)->node_spanned_pages;
+	unsigned long end_aligned_pfn;
+	int count = 0;
+	struct page *page;
+	u32 mark_free = 0x2;				/* Important !! */
+	u32 ret_map = 0x0;
+
+	/* Initialize */
+	pasrbank_pfn = pasrbank_size >> PAGE_SHIFT;
+	pasrbank_bn = pasrbank_pfn >> (MAX_ORDER - 1);
+	start_pfn = pasrbank_pfn;				/* Important !! */
+	end_aligned_pfn = end_pfn & ~(pasrbank_pfn - 1);
+
+	/* Verification : start offset is 128MB */
+	if (!lock_buddy) {
+		do {
+			page = pfn_to_page(start_pfn++);
+			if (page_count(page) != 0) {
+				++count;
+			}
+			if ((start_pfn % pasrbank_pfn) == 0) {
+				printk(KERN_INFO "0x%x ~ 0x%x : [%d]\n",start_pfn-pasrbank_pfn, start_pfn-1, count);
+				count = 0;
+			}	
+		} while (start_pfn < end_pfn);
+
+		if (start_pfn % pasrbank_pfn) {
+			printk(KERN_INFO "0x%x ~ 0x%x : [%d]\n",start_pfn-(start_pfn % pasrbank_pfn), start_pfn-1, count);
+			count = 0;
+		}
+		
+		/* Restore start_pfn */
+		start_pfn = pasrbank_pfn;				/* Important !! */
+	}
+
+	/* STEP I. Drain pageset of "ZONE_NORMAL" zone(s). */
+	z = &NODE_DATA(0)->node_zones[ZONE_NORMAL];
+	if (populated_zone(z)) {
+		/* Go through all per-cpu lists */
+		for_each_possible_cpu(cpu) {
+			struct per_cpu_pageset *pset;
+			struct per_cpu_pages *pcp;
+			
+			pset = per_cpu_ptr(z->pageset, cpu);	
+			pcp = &pset->pcp;
+	
+			local_irq_save(flags);
+			if (pcp->count) {
+				free_pcppages_bulk(z, pcp->count, pcp);
+				pcp->count = 0;
+			}
+			local_irq_restore(flags);	
+		}
+	}
+
+	/* STEP II. Scan global mem_map in 1^(MAX_ORDER - 1) step. */
+
+	/* Is irq_disabled() needed? */
+
+	/* start_pfn ~ end_aligned_pfn */
+	do {	
+		/* Scan bank */
+		page = pfn_to_page(start_pfn);
+		do {
+			if (PageBuddy(page) && (page_order(page) == (MAX_ORDER - 1))) {
+				page += MAX_ORDER_NR_PAGES;
+			} else {
+				page += ((pasrbank_bn - count) * MAX_ORDER_NR_PAGES);
+				break;
+			}
+		} while (++count < pasrbank_bn);
+		/* mark it as free */
+		if (count == pasrbank_bn) {
+			ret_map |= mark_free;
+		}
+		/* left-shift mark_free */
+		mark_free <<= 1;
+		/* Go to next bank */
+		start_pfn += pasrbank_pfn;
+		count = 0;
+	} while (start_pfn < end_aligned_pfn);
+
+	/* end_aligned_pfn ~ end_pfn */
+	end_aligned_pfn = end_pfn & ~(MAX_ORDER_NR_PAGES - 1);
+	while (start_pfn < end_aligned_pfn) {
+		page = pfn_to_page(start_pfn);
+		if (PageBuddy(page) && (page_order(page) == (MAX_ORDER - 1))) {
+		} else {
+			mark_free = 0;
+			break;
+		}
+		start_pfn += MAX_ORDER_NR_PAGES;
+	}
+
+	/* If mark_free is 0, then no need to scan remaining pages */
+	if (mark_free) {
+		while (start_pfn < end_pfn) {
+			page = pfn_to_page(start_pfn++);
+			if (page_count(page) == 0) {
+			} else {
+				mark_free = 0;
+				break;
+			}
+		}
+	}
+	
+	/* Show bank status again */
+	{	
+		printk(KERN_INFO"\n\n\n");
+		start_pfn = pasrbank_pfn;				/* Important !! */
+
+		do {
+			page = pfn_to_page(start_pfn++);
+			if (page_count(page) != 0) {
+				++count;
+			}
+			if ((start_pfn % pasrbank_pfn) == 0) {
+				printk(KERN_INFO "0x%x ~ 0x%x : [%d]\n",start_pfn-pasrbank_pfn, start_pfn-1, count);
+				count = 0;
+			}	
+		} while (start_pfn < end_pfn);
+
+		if (start_pfn % pasrbank_pfn) {
+			printk(KERN_INFO "0x%x ~ 0x%x : [%d]\n",start_pfn-(start_pfn % pasrbank_pfn), start_pfn-1, count);
+			count = 0;
+		}
+	}
+
+	/* Finally, update ret_map & lock the buddy system */
+	ret_map |= mark_free;
+	printk(KERN_INFO "Current Memory Status (for passive PASR)= 0x%x\n",ret_map);
+	printk(KERN_INFO"\n\n\n");
+	if (lock_buddy)
+		buddy_is_locked = 1;
+	
+	return ret_map;
 }
-EXPORT_SYMBOL(pasr_compute_safe_order);
-#endif /* CONFIG_MTKPASR */
+EXPORT_SYMBOL(enter_passive_pasr);
+
+/*
+ * Key to unlock the door of buddy system (locked by enter_passive_pasr)
+ */
+void exit_passive_pasr(void)
+{
+	buddy_is_locked = 0;
+}
+EXPORT_SYMBOL(exit_passive_pasr);
+
+#endif /* CONFIG_ARM && CONFIG_PASR */
