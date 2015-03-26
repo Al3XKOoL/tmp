@@ -542,6 +542,13 @@ static void ipi_cpu_stop(unsigned int cpu)
 	local_fiq_disable();
 	local_irq_disable();
 
+        /* For L1 data coherence with the other cores, 
+         * we need to flush this core's l1 cache. by Chia-Hao Hsu 
+         */
+        flush_cache_all();
+        cpu_proc_fin();
+        flush_cache_all();
+
 	while (1)
 		cpu_relax();
 }

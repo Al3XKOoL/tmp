@@ -32,7 +32,6 @@
 #include <linux/hw_breakpoint.h>
 #include <linux/cpuidle.h>
 #include <linux/console.h>
-#include <linux/mtk_ram_console.h>
 
 #include <asm/cacheflush.h>
 #include <asm/processor.h>
@@ -383,9 +382,6 @@ void machine_halt(void)
 void machine_power_off(void)
 {
 	machine_shutdown();
-#ifdef MTK_EMMC_SUPPORT 
-last_kmsg_store_to_emmc();
-#endif
 	if (pm_power_off)
 		pm_power_off();
 }
