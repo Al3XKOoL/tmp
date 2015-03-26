@@ -1,73 +1,91 @@
-## Android Makefile for kernel module
-## by Kirby.Wu, 20090729, mediatek.inc
-##
-## this android makefile is (currently) used to build all kernel modules 
-## and put them into android platform output directory. 
-##
-## to build kernel modules into system.img,
-##   config build/target/board/<target>/BoardConfig.mk:
-##     KERNEL_CONFIG_FILE := <your desired config file> # use .config if omit
-##     TARGET_MODULES     := true                       # do make modules
-##
+#
+# Copyright (C) 2009-2011 The Android-x86 Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
 
-
-MTK_CURRENT_KERNEL_DIR := $(call my-dir)
-ifeq (kernel, $(lastword  $(subst /, , $(MTK_CURRENT_KERNEL_DIR))))
-KERNEL_DIR := kernel
-#KERNEL_DIR := $(call my-dir)
-KERNEL_DIR_TO_ROOT := ..
-#ARCH ?= arm
-#CROSS_COMPILE ?= arm-linux-androideabi-
-KERNEL_MAKE_CMD := + make MTK_PROJECT=$(MTK_PROJECT) -C $(KERNEL_DIR) $(if $(strip $(SHOW_COMMANDS)),V=1)
-
-ifeq ($(strip $(KBUILD_OUTPUT_SUPPORT)),yes)
-KBUILD_OUTPUT := $(KERNEL_DIR_TO_ROOT)/$(MTK_ROOT_OUT)/KERNEL_OBJ
-KERNEL_OUTPUT_TO_ROOT := $(KERNEL_DIR_TO_ROOT)/../../../../..
-KERNEL_DOTCONFIG_FILE := $(KBUILD_OUTPUT)/.config
-KERNEL_MAKE_CMD += O=$(KBUILD_OUTPUT)
-$(shell mkdir -p $(MTK_ROOT_OUT)/KERNEL_OBJ)
+ifneq ($(TARGET_BUILD_VARIANT), user)
+KERNEL_DEFCONFIG ?= $(strip $(TARGET_DEVICE))_debug_defconfig
 else
-KERNEL_OUTPUT :=
-KERNEL_OUTPUT_TO_ROOT := $(KERNEL_DIR_TO_ROOT)
-KERNEL_DOTCONFIG_FILE := .config
+KERNEL_DEFCONFIG ?= $(strip $(TARGET_DEVICE))_defconfig
 endif
 
-ifneq ($(filter /% ~%,$(TARGET_OUT)),)
-KERNEL_MODULE_INSTALL_PATH := $(TARGET_OUT)
-else
-KERNEL_MODULE_INSTALL_PATH := $(KERNEL_OUTPUT_TO_ROOT)/$(TARGET_OUT)
+KERNEL_DIR := $(call my-dir)
+ROOTDIR := $(abspath $(TOP))
+
+KERNEL_OUT := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ
+TARGET_PREBUILT_KERNEL := $(KERNEL_OUT)/arch/arm/boot/zImage
+#TARGET_PREBUILT_KERNEL_BIN := $(KERNEL_OUT)/arch/arm/boot/zImage.bin
+TARGET_KERNEL_CONFIG := $(KERNEL_OUT)/.config
+KERNEL_HEADERS_INSTALL := $(KERNEL_OUT)/usr
+KERNEL_MODULES_OUT := $(TARGET_OUT)/lib/modules
+KERNEL_MODULES_SYMBOLS_OUT := $(PRODUCT_OUT)/symbols/system/lib/modules
+
+ifeq ($(KERNEL_CROSS_COMPILE),)
+KERNEL_CROSS_COMPILE := arm-eabi-
 endif
 
-#$(info using $(KERNEL_CONFIG_FILE) .... )
-ifeq ($(TARGET_KMODULES),true)
-ALL_PREBUILT += $(TARGET_OUT)/lib/modules/modules.order
-$(BUILT_SYSTEMIMAGE): kernel_modules
-$(TARGET_OUT)/lib/modules/modules.order: kernel_modules
-ifneq ($(ONE_SHOT_MAKEFILE),)
-all_modules: kernel_modules
-endif
+define mv-modules
+mdpath=`find $(1) -type f -name modules.dep`;\
+if [ "$$mdpath" != "" ];then\
+mpath=`dirname $$mdpath`;\
+ko=`find $$mpath/kernel -type f -name *.ko`;\
+for i in $$ko; do mv $$i $(1)/; done;\
+fi
+endef
 
-################
-## For WLAN switch
-################
-LINK_WLAN_NAME := $(TARGET_OUT)/lib/modules/wlan
-LINK_P2P_NAME := $(TARGET_OUT)/lib/modules/p2p
+define clean-module-folder
+rm -rf $(1)/lib
+endef
 
-KO_POSTFIX := _$(shell echo $(strip $(MTK_WLAN_CHIP)) | tr A-Z a-z)
+$(KERNEL_OUT):
+	mkdir -p $@
 
-CUR_WLAN_KO_NAME := wlan$(KO_POSTFIX).ko
-CUR_P2P_KO_NAME := p2p$(KO_POSTFIX).ko
+$(KERNEL_MODULES_OUT):
+	mkdir -p $@
 
-CUR_WLAN_KO_PATH := $(TARGET_OUT)/lib/modules/$(CUR_WLAN_KO_NAME)
-CUR_P2P_KO_PATH := $(TARGET_OUT)/lib/modules/$(CUR_P2P_KO_NAME)
+.PHONY: kernel kernel-defconfig kernel-menuconfig kernel-modules clean-kernel
+kernel-menuconfig: | $(KERNEL_OUT)
+	$(MAKE) -C $(KERNEL_DIR) O=$(ROOTDIR)/$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) menuconfig
 
-kernel_modules:
-	@echo "building linux kernel modules..."
-	$(KERNEL_MAKE_CMD) modules
-	$(KERNEL_MAKE_CMD) INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH=$(KERNEL_MODULE_INSTALL_PATH) INSTALL_MOD_DIR=$(KERNEL_MODULE_INSTALL_PATH) android_modules_install
-ifeq ($(strip $(MTK_WLAN_SUPPORT)),yes)
-	-@ln -sf $(CUR_WLAN_KO_NAME) $(LINK_WLAN_NAME).ko
-endif
+kernel-savedefconfig: | $(KERNEL_OUT)
+	cp $(TARGET_KERNEL_CONFIG) $(KERNEL_DIR)/arch/arm/configs/$(KERNEL_DEFCONFIG)
 
-endif #ifeq ($(TARGET_KMODULES),true)
-endif
+$(TARGET_PREBUILT_KERNEL): kernel
+
+$(TARGET_KERNEL_CONFIG) kernel-defconfig: $(KERNEL_DIR)/arch/arm/configs/$(KERNEL_DEFCONFIG) | $(KERNEL_OUT)
+	$(MAKE) -C $(KERNEL_DIR) O=$(ROOTDIR)/$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) $(KERNEL_DEFCONFIG)
+	$(MAKE) -C $(KERNEL_DIR) O=$(ROOTDIR)/$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) oldconfig
+
+$(KERNEL_HEADERS_INSTALL): $(TARGET_KERNEL_CONFIG) | $(KERNEL_OUT)
+	$(MAKE) -C $(KERNEL_DIR) O=$(ROOTDIR)/$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) headers_install
+
+kernel: $(TARGET_KERNEL_CONFIG) $(KERNEL_HEADERS_INSTALL) | $(KERNEL_OUT)
+	$(MAKE) -C $(KERNEL_DIR) O=$(ROOTDIR)/$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=$(KERNEL_CROSS_COMPILE)
+	$(MAKE) -C $(KERNEL_DIR) O=$(ROOTDIR)/$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) modules
+	$(MAKE) -C $(KERNEL_DIR) O=$(ROOTDIR)/$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) INSTALL_MOD_PATH=$(ROOTDIR)/$(KERNEL_MODULES_SYMBOLS_OUT) modules_install
+	$(call mv-modules,$(ROOTDIR)/$(KERNEL_MODULES_SYMBOLS_OUT))
+	$(call clean-module-folder,$(ROOTDIR)/$(KERNEL_MODULES_SYMBOLS_OUT))
+	$(MAKE) -C $(KERNEL_DIR) O=$(ROOTDIR)/$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) INSTALL_MOD_PATH=$(ROOTDIR)/$(KERNEL_MODULES_OUT) INSTALL_MOD_STRIP=1 modules_install
+	$(call mv-modules,$(ROOTDIR)/$(KERNEL_MODULES_OUT))
+	$(call clean-module-folder,$(ROOTDIR)/$(KERNEL_MODULES_OUT))
+
+kernel-modules: kernel | $(KERNEL_MODULES_OUT)
+
+$(INSTALLED_KERNEL_TARGET): kernel
+
+#$(TARGET_PREBUILT_KERNEL_BIN): $(TARGET_PREBUILT_KERNEL) | $(HOST_OUT_EXECUTABLES)/mkimage
+#	$(HOST_OUT_EXECUTABLES)/mkimage $< KERNEL 0xffffffff > $@ 	
+
+$(INSTALLED_KERNEL_TARGET): $(TARGET_PREBUILT_KERNEL) | $(ACP)
+	$(copy-file-to-target)
+
+systemimage: kernel-modules
+
+clean-kernel:
+	@rm -rf $(KERNEL_OUT)
+	@rm -rf $(KERNEL_MODULES_OUT)
