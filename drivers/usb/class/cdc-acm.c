@@ -51,7 +51,7 @@
 
 #include "cdc-acm.h"
 
-#ifdef MTK_DT_SUPPORT 
+#ifdef CONFIG_MTK_DT_SUPPORT 
 #define USB_WAKE_TIME 5 // seconds for hold wake lock and suspend schedule, please also check musbfsh_core.c to sync, they should be the same
 #define DATA_DUMP_BYTES 15 //  how many bytes we'll print out for each packet
 #define DATA_DUMP_SIZE 64 //  should be large enough to hold DATA_DUMP_DIGITS
@@ -261,7 +261,7 @@ static int acm_write_start(struct acm *acm, int wbn)
 	dev_vdbg(&acm->data->dev, "%s - susp_count %d\n", __func__,
 							acm->susp_count);
 	usb_autopm_get_interface_async(acm->control);
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 	if (acm->susp_count) {
 		if (!acm->delayed_wb) {
 			dbg_mtk(&acm->data->dev, "data writing after suspend. cnt=%d", acm->susp_count);
@@ -457,7 +457,7 @@ static int acm_submit_read_urbs(struct acm *acm, gfp_t mem_flags)
 static void acm_process_read_urb(struct acm *acm, struct urb *urb)
 {
 	struct tty_struct *tty;
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 	int i, len;
 #endif
 
@@ -468,7 +468,7 @@ static void acm_process_read_urb(struct acm *acm, struct urb *urb)
 	if (!tty)
 		return;
 
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 	if(enable_dump) {
 		len = sprintf(data_in, "DT-I: ");
 		for(i=0; i<urb->actual_length && i<DATA_DUMP_BYTES; i++) {
@@ -585,7 +585,7 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 {
 	struct acm *acm = tty->driver_data;
 
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 	dbg_mtk(&acm->control->dev, "%s port_cnt=%d", __func__, acm->port.count);
 	if(enable_dump) {
 		dbg_mtk(&acm->control->dev, "termios c_iflag=%x, c_oflag=%x c_cflag=%x, c_lflag=%x, c_line=%x, c_ispeed=%x, c_ospeed=%x",
@@ -595,7 +595,7 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 	dev_dbg(&acm->control->dev, "%s\n", __func__);
 #endif
 
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 		/* assume modem is capable of remote wakeup to fool autosuspend_check()
 		 * or we can use device_set_wakeup_capable() to fool autosuspend_check(),
 		 * or modem could mark itself capable of remote wakeup in config desc's bmAttribute filed 
@@ -682,7 +682,7 @@ static void acm_port_destruct(struct tty_port *port)
 	kfree(acm);
 }
 
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 bool usb_h_acm_all_clear(void)
 {
 	int i;
@@ -732,7 +732,7 @@ static void acm_tty_cleanup(struct tty_struct *tty)
 static void acm_tty_hangup(struct tty_struct *tty)
 {
 	struct acm *acm = tty->driver_data;
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 	if(!acm) {
 		printk("[CDC-ACM-MTK] acm_tty_hangup, acm is null!\n");
 		return;
@@ -758,7 +758,7 @@ static int acm_tty_write(struct tty_struct *tty,
 	unsigned long flags;
 	int wbn;
 	struct acm_wb *wb;
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 	int i, len;
 #endif
 
@@ -767,7 +767,7 @@ static int acm_tty_write(struct tty_struct *tty,
 
 	dev_vdbg(&acm->data->dev, "%s - count %d\n", __func__, count);
 
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 	if(enable_dump) {
 		len = sprintf(data_out, "DT-O: ");
 		for(i=0; i<count && i<DATA_DUMP_BYTES; i++) {
@@ -801,7 +801,7 @@ static int acm_tty_write(struct tty_struct *tty,
 static int acm_tty_write_room(struct tty_struct *tty)
 {
 	struct acm *acm = tty->driver_data;
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 	if(acm->delayed_wb) {
 		dbg_mtk(&acm->data->dev, "no room for data writing. cnt=%d", acm->susp_count);
 		return 0;
@@ -869,7 +869,7 @@ static int acm_tty_tiocmget(struct tty_struct *tty)
 {
 	struct acm *acm = tty->driver_data;
 
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 	if(enable_dump) {
 		dbg_mtk(&acm->control->dev, "tiocmget ctrlin=%x\n", acm->ctrlin);
 	}
@@ -888,7 +888,7 @@ static int acm_tty_tiocmset(struct tty_struct *tty,
 	struct acm *acm = tty->driver_data;
 	unsigned int newctrl;
 
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 	if(enable_dump) {
 		dbg_mtk(&acm->control->dev, "tiocmset ctrlout=%x\n", acm->ctrlout);
 	}
@@ -993,7 +993,7 @@ static void acm_tty_set_termios(struct tty_struct *tty,
 	struct usb_cdc_line_coding newline;
 	int newctrl = acm->ctrlout;
 
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 	if(enable_dump) {
 		dbg_mtk(&acm->control->dev, "termios c_iflag=%x, c_oflag=%x c_cflag=%x, c_lflag=%x, c_line=%x, c_ispeed=%x, c_ospeed=%x",
 			termios->c_iflag, termios->c_oflag, termios->c_cflag, termios->c_lflag, termios->c_line, termios->c_ispeed, termios->c_ospeed);
@@ -1469,7 +1469,7 @@ skip_countries:
 	acm->ctrlurb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 	acm->ctrlurb->transfer_dma = acm->ctrl_dma;
 
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 	dev_warn(&intf->dev, "ttyACM%d: USB ACM device\n", minor);
 #else
 	dev_info(&intf->dev, "ttyACM%d: USB ACM device\n", minor);
@@ -1488,7 +1488,7 @@ skip_countries:
 	tty_register_device(acm_tty_driver, minor, &control_interface->dev);
 
 
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 #ifdef CONFIG_USB_SUSPEND
 	usb_enable_autosuspend(usb_dev); // runtime power management is disabled when running here, due to unknown reason
 	pm_runtime_use_autosuspend(&usb_dev->dev); // use interface's specific device
@@ -1921,7 +1921,7 @@ static int __init acm_init(void)
 	acm_tty_driver->init_termios = tty_std_termios;
 	acm_tty_driver->init_termios.c_cflag = B9600 | CS8 | CREAD |
 								HUPCL | CLOCAL;
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 	/* disable echo and other flags in the very beginning. 
 	 * otherwise RILD will disable them via calling tcsetattr() after it opened tty port,
 	 * so there may be a gap between port opening and calling tcsetattr(). If modem send data
@@ -1960,7 +1960,7 @@ static void __exit acm_exit(void)
 
 module_init(acm_init);
 module_exit(acm_exit);
-#ifdef MTK_DT_SUPPORT
+#ifdef CONFIG_MTK_DT_SUPPORT
 module_param(enable_debug, int, 0644);
 module_param(enable_dump, int, 0644);
 #endif

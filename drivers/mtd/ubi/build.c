@@ -45,7 +45,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include "ubi.h"
-#ifdef MTK_COMBO_NAND_SUPPORT
+#ifdef CONFIG_MTK_COMBO_NAND_SUPPORT
 #include "combo_nand.h"
 #endif
 
@@ -663,7 +663,7 @@ static int io_init(struct ubi_device *ubi)
 	 * physical eraseblocks maximum.
 	 */
 
-#ifdef MTK_COMBO_NAND_SUPPORT
+#ifdef CONFIG_MTK_COMBO_NAND_SUPPORT
 	ubi->peb_size   = COMBO_NAND_BLOCK_SIZE;
 	ubi->peb_count  = (int)div_u64(ubi->mtd->size, ubi->peb_size);
 #else
@@ -680,7 +680,7 @@ static int io_init(struct ubi_device *ubi)
 		ubi->nor_flash = 1;
 	}
 
-#ifdef MTK_COMBO_NAND_SUPPORT
+#ifdef CONFIG_MTK_COMBO_NAND_SUPPORT
 	ubi->min_io_size = COMBO_NAND_PAGE_SIZE;
 	ubi->hdrs_min_io_size = ubi->min_io_size >> ubi->mtd->subpage_sft;
 #else
@@ -703,7 +703,7 @@ static int io_init(struct ubi_device *ubi)
 	ubi_assert(ubi->hdrs_min_io_size <= ubi->min_io_size);
 	ubi_assert(ubi->min_io_size % ubi->hdrs_min_io_size == 0);
 
-#ifdef MTK_COMBO_NAND_SUPPORT
+#ifdef CONFIG_MTK_COMBO_NAND_SUPPORT
 	ubi->max_write_size = COMBO_NAND_PAGE_SIZE;
 #else
 	ubi->max_write_size = ubi->mtd->writebufsize;

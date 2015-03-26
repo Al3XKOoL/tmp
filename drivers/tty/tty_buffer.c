@@ -467,7 +467,7 @@ static void flush_to_ldisc(struct work_struct *work)
  */
 void tty_flush_to_ldisc(struct tty_struct *tty)
 {
-	flush_work_sync(&tty->buf.work);
+	flush_work(&tty->buf.work);
 }
 
 /**

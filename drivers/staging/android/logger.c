@@ -31,9 +31,15 @@
 
 #include <asm/ioctls.h>
 
+#include <linux/proc_fs.h>
+
+#define LOG_TS_FILE    "log_ts"
+
 static int s_fake_read;
 
 module_param_named(fake_read, s_fake_read, int, 0660);
+
+int g_ts_switch = 0; // 0: android default timestamp; 1: kernel timestamp
 
 /*
  * struct logger_log - represents a specific log, such as 'main' or 'radio'
@@ -535,8 +541,9 @@ ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	struct logger_entry header;
 	struct timespec now;
 	ssize_t ret = 0;
-
-
+	
+/* make android timestamp same with printk {*/
+	if (g_ts_switch == 0) {
 		// android default timestamp
 		//now = current_kernel_time();
 		getnstimeofday(&now);
@@ -548,6 +555,25 @@ ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 		header.len = min_t(size_t, iocb->ki_left, LOGGER_ENTRY_MAX_PAYLOAD);
 		header.hdr_size = sizeof(struct logger_entry);
 
+	} 
+	else {
+		// use kernel timestamp
+		unsigned long long t;
+		unsigned long nanosec_rem;
+		
+		t = cpu_clock(UINT_MAX);
+		nanosec_rem = do_div(t, 1000000000);
+
+		header.pid = current->tgid;
+		header.tid = current->pid;
+		header.sec = (unsigned long)t;
+		header.nsec = nanosec_rem;
+		header.euid = current_euid();
+		header.len = min_t(size_t, iocb->ki_left, LOGGER_ENTRY_MAX_PAYLOAD);
+		header.hdr_size = sizeof(struct logger_entry);
+	}
+/* } */
+	
 	/* null writes succeed, return zero */
 	if (unlikely(!header.len))
 		return 0;
@@ -840,6 +866,68 @@ static struct logger_log *get_log_from_minor(int minor)
 	return NULL;
 }
 
+static int ts_switch_read(char *page, char **start, off_t off,
+			       int count, int *eof, void *data)
+{
+    char *p = page;
+    int len = 0;
+
+	//printk(KERN_INFO "logger: ts_switch_read\n");
+
+	p += sprintf(p, "%d\n",g_ts_switch);
+
+    *start = page + off;
+
+    len = p - page;
+    if (len > off)
+        len -= off;
+    else
+        len = 0;
+
+    return len < count ? len  : count;
+}
+
+static int ts_switch_write (struct file *file, const char *buffer,
+					unsigned long count, void *data)
+{
+	char ts_switch = 0;
+
+	if(copy_from_user((void *)&ts_switch, (const void __user *)buffer, sizeof(char))) {
+		printk(KERN_ERR "logger: ts_switch_write copy_from_user fails\n");
+		return 0;
+	}
+
+	//printk(KERN_INFO "logger: ts_switch_write ts_switch = %d\n", ts_switch);
+	switch(ts_switch) {
+	case '0':
+		g_ts_switch = 0;
+		printk(KERN_INFO "logger: ts_switch_write g_ts_switch == 0\n");
+		break;
+	case '1':
+		g_ts_switch = 1;
+		printk(KERN_INFO "logger: ts_switch_write g_ts_switch == 1\n");
+		break;
+	default:
+		printk(KERN_ERR "logger: ts_switch_write incorrect parameter\n");
+		break;
+	}
+
+    return count;
+}
+
+static void init_log_proc(void)
+{
+	struct proc_dir_entry *ts_switch_file;
+	g_ts_switch = 0; // using android default log timestamp
+	
+	ts_switch_file = create_proc_entry(LOG_TS_FILE, 0, NULL);
+	if (ts_switch_file) {
+		ts_switch_file->read_proc = ts_switch_read;
+		ts_switch_file->write_proc = ts_switch_write;
+	} 
+	else
+		printk(KERN_ERR "xlog: init_log_proc create_proc_entry fails\n");
+}
 
 static int __init init_log(struct logger_log *log)
 {
@@ -877,6 +965,8 @@ static int __init logger_init(void)
 	ret = init_log(&log_system);
 	if (unlikely(ret))
 		goto out;
+
+	init_log_proc();
 
 out:
 	return ret;

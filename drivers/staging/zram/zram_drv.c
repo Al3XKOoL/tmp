@@ -460,11 +460,7 @@ static void zram_make_request(struct request_queue *queue, struct bio *bio)
 {
 	struct zram *zram = queue->queuedata;
 
-	/* Fix lock prove warning */
-	if (!down_read_trylock(&zram->init_lock)) {
-		goto error_nolock;
-	}
-
+	down_read(&zram->init_lock);
 	if (unlikely(!zram->init_done))
 		goto error;
 
@@ -480,8 +476,6 @@ static void zram_make_request(struct request_queue *queue, struct bio *bio)
 
 error:
 	up_read(&zram->init_lock);
-
-error_nolock:
 	bio_io_error(bio);
 }
 
@@ -534,7 +528,6 @@ struct zram_meta *zram_meta_alloc(u64 disksize)
 {
 	size_t num_pages;
 	struct zram_meta *meta = kmalloc(sizeof(*meta), GFP_KERNEL);
-
 	if (!meta)
 		goto out;
 
@@ -558,7 +551,7 @@ struct zram_meta *zram_meta_alloc(u64 disksize)
 		goto free_buffer;
 	}
 
-	meta->mem_pool = zs_create_pool("zram", GFP_NOIO | __GFP_HIGHMEM | GFP_NO_MTKPASR);
+	meta->mem_pool = zs_create_pool("zram", GFP_NOIO | __GFP_HIGHMEM);
 	if (!meta->mem_pool) {
 		pr_err("Error creating memory pool\n");
 		goto free_table;

@@ -1658,7 +1658,9 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 			 * prepare it again and resend.
 			 */
 			mmc_blk_rw_rq_prep(mq_rq, card, disable_multi, mq);
+#ifndef CONFIG_MTK_TC1_FEATURE
 			mmc_start_req(card->host, &mq_rq->mmc_active, NULL);
+#endif /* CONFIG_MTK_TC1_FEATURE */
 		}
 	} while (ret);
 	time2 = sched_clock();
@@ -1909,7 +1911,7 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
 static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 {
 	sector_t size;
-#ifdef MTK_EMMC_SUPPORT
+#ifdef CONFIG_MTK_EMMC_SUPPORT
     unsigned int l_reserve;
 	struct storage_info s_info = {0};
 #endif
@@ -1930,7 +1932,7 @@ static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 	}
 
 	if(!mmc_card_sd(card)){
-#ifdef MTK_EMMC_SUPPORT
+#ifdef CONFIG_MTK_EMMC_SUPPORT
             msdc_get_info(EMMC_CARD_BOOT, EMMC_RESERVE, &s_info);
             l_reserve =  s_info.emmc_reserve;
             printk("l_reserve = 0x%x\n", l_reserve);
@@ -2141,7 +2143,7 @@ static const struct mmc_fixup blk_fixups[] =
 		  MMC_QUIRK_SEC_ERASE_TRIM_BROKEN),
 	MMC_FIXUP("VZL00M", CID_MANFID_SAMSUNG, CID_OEMID_ANY, add_quirk_mmc,
 		  MMC_QUIRK_SEC_ERASE_TRIM_BROKEN),
-		  
+
 	/* Hynix 4.41 trim will lead boot up failed. */
 	MMC_FIXUP(CID_NAME_ANY, CID_MANFID_HYNIX, CID_OEMID_ANY, add_quirk_mmc,
 		  MMC_QUIRK_TRIM_UNSTABLE),
@@ -2149,9 +2151,6 @@ static const struct mmc_fixup blk_fixups[] =
 	END_FIXUP
 };
 
-#if defined(MTK_EMMC_SUPPORT)
-	extern void emmc_create_sys_symlink (struct mmc_card *card);
-#endif
 static int mmc_blk_probe(struct mmc_card *card)
 {
 	struct mmc_blk_data *md, *part_md;
@@ -2178,7 +2177,7 @@ static int mmc_blk_probe(struct mmc_card *card)
 
 	mmc_set_drvdata(card, md);
 	mmc_fixup_device(card, blk_fixups);
-    
+
 	printk("[%s]: %s by manufacturer settings, quirks=0x%x\n", __func__, md->disk->disk_name, card->quirks); 
 
 #ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
@@ -2191,9 +2190,6 @@ static int mmc_blk_probe(struct mmc_card *card)
 		if (mmc_add_disk(part_md))
 			goto out;
 	}
-#if defined(MTK_EMMC_SUPPORT)
-	emmc_create_sys_symlink(card);
-#endif
 	return 0;
 
  out:

@@ -1111,7 +1111,7 @@ static void receive_file_work(struct work_struct *data)
 	int ret, cur_buf = 0;
 	int r = 0;
 	//Modification for ALPS00434059 begin
-#if defined(MTK_SHARED_SDCARD)
+#if defined(CONFIG_MTK_SHARED_SDCARD)
 	int64_t total_size=0;
 #endif
 	//Modification for ALPS00434059 begin
@@ -1148,7 +1148,7 @@ static void receive_file_work(struct work_struct *data)
 		//Modification for ALPS00434059 begin
 		//This might be modified TBD, 
 		//so far, there is only sharedSD with EXT4 FFS could transfer Object with size oevr 4GBs
-		#if defined(MTK_SHARED_SDCARD)
+		#if defined(CONFIG_MTK_SHARED_SDCARD)
 			if(total_size >= 0xFFFFFFFF)
 				read_req->short_not_ok = 0;
 			else{
@@ -1277,7 +1277,7 @@ static void receive_file_work(struct work_struct *data)
 				count -= read_req->actual;
 
 		//Modification for ALPS00434059 begin
-		#if defined(MTK_SHARED_SDCARD)
+		#if defined(CONFIG_MTK_SHARED_SDCARD)
 			total_size += read_req->actual;
 			DBG(cdev, "%s, line %d: count = %lld, total_size = %lld, read_req->actual = %d, read_req->length= %d\n", __func__, __LINE__, count, total_size, read_req->actual, read_req->length);
 		#endif

@@ -401,8 +401,6 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 {
 	int err = 0;
 	int start_err = 0;
-	int retry_times = 0;
-
 	struct mmc_async_req *data = host->areq;
 
 	/* Prepare a new request */
@@ -430,8 +428,7 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 		host->ops->send_stop(host,host->areq->mrq); //add for MTK msdc host <Yuchi Xu>
 		do{
 			host->ops->tuning(host, host->areq->mrq);	//add for MTK msdc host <Yuchi Xu>
-			retry_times++;
-		}while((host->ops->check_written_data(host,host->areq->mrq))&&(retry_times<10));
+		}while(host->ops->check_written_data(host,host->areq->mrq));
 #ifdef MTK_IO_PERFORMANCE_DEBUG
         if ((1 == g_mtk_mmc_perf_dbg) && (2 == g_mtk_mmc_dbg_range)){
             if ((host->areq->mrq->cmd->arg >= g_dbg_range_start) && (host->areq->mrq->cmd->arg <= g_dbg_range_end) && (host->areq->mrq->data) && (host->areq->mrq->cmd->opcode == g_check_read_write)){ 
@@ -1705,7 +1702,7 @@ static int mmc_do_erase(struct mmc_card *card, unsigned int from,
 {
 	struct mmc_command cmd = {0};
 	unsigned int qty = 0;
-	unsigned long timeout;
+    unsigned long timeout;
 	unsigned int fr, nr;
 	int err;
 
@@ -1803,7 +1800,7 @@ static int mmc_do_erase(struct mmc_card *card, unsigned int from,
 			goto out;
 		}
 
-		/* Timeout if the device never becomes ready for data and
+        /* Timeout if the device never becomes ready for data and
 		 * never leaves the program state.
 		 */
 		if (time_after(jiffies, timeout)) {
@@ -1900,9 +1897,8 @@ EXPORT_SYMBOL(mmc_can_erase);
 
 int mmc_can_trim(struct mmc_card *card)
 {
-	if ((card->ext_csd.sec_feature_support & EXT_CSD_SEC_GB_CL_EN) && !(card->quirks & MMC_QUIRK_TRIM_UNSTABLE))
+    if ((card->ext_csd.sec_feature_support & EXT_CSD_SEC_GB_CL_EN) && !(card->quirks & MMC_QUIRK_TRIM_UNSTABLE))
 		return 1;
-	//printk(KERN_ERR "[%s]: quirks=0x%x, MMC_QUIRK_TRIM_UNSTABLE=0x%x\n", __func__, card->quirks, MMC_QUIRK_TRIM_UNSTABLE); 
 	return 0;
 }
 EXPORT_SYMBOL(mmc_can_trim);
@@ -2222,9 +2218,6 @@ int mmc_detect_card_removed(struct mmc_host *host)
 }
 EXPORT_SYMBOL(mmc_detect_card_removed);
 
-#ifdef CONFIG_MTK_HIBERNATION
-extern void mmc_rescan_wait_finish(void);
-#endif
 void mmc_rescan(struct work_struct *work)
 {
 	static const unsigned freqs[] = { 400000, 300000, 200000, 100000 };
@@ -2288,11 +2281,6 @@ void mmc_rescan(struct work_struct *work)
 	mmc_release_host(host);
 
  out:
-#ifdef CONFIG_MTK_HIBERNATION
-    if (unlikely(host->index == 1)) {
-        mmc_rescan_wait_finish();
-    }
-#endif
 	if (extend_wakelock)
 		wake_lock_timeout(&host->detect_wake_lock, HZ / 2);
 	else

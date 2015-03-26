@@ -454,12 +454,8 @@ static struct page *alloc_zspage(struct size_class *class, gfp_t flags)
 	error = -ENOMEM;
 	for (i = 0; i < class->pages_per_zspage; i++) {
 		struct page *page;
-		#ifndef CONFIG_MTK_PAGERECORDER
-			page = alloc_page(flags);
-		#else
-			page = alloc_page_nopagedebug(flags);
-		#endif
 
+		page = alloc_page(flags);
 		if (!page)
 			goto cleanup;
 
