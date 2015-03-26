@@ -6,7 +6,7 @@ obj_to_install := \
  ../mediatek/platform/mt6516/kernel/core:mt6516_intr.o \
  ../mediatek/platform/mt6516/kernel/core:MT6516_sleep.o
 
-ifeq ($(MTK_WAPI_SUPPORT),yes)
+ifeq ($(CONFIG_MTK_WAPI_SUPPORT),y)
 obj_to_install +=  ../mediatek/source/kernel/drivers/net/mt592x/wlan:gl_sec.o \
 
 endif
