@@ -374,8 +374,7 @@ static void convert_fuse_statfs(struct kstatfs *stbuf, struct fuse_kstatfs *attr
 	stbuf->f_files   = attr->files;
 	stbuf->f_ffree   = attr->ffree;
 	stbuf->f_namelen = attr->namelen;
-//#ifdef LIMIT_SDCARD_SIZE
-#if 0
+#ifdef LIMIT_SDCARD_SIZE
 	stbuf->f_blocks  -= (u32)data_free_size_th/attr->bsize;
 	
 	if(stbuf->f_bfree < ((u32)data_free_size_th/attr->bsize)){

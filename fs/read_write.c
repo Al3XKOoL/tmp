@@ -433,7 +433,7 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 	//static long long store = 0;
 	unsigned char num = 0;
 	struct mount *mount_data;
-	char *file_list[10] = {"ccci_fsd", "ccci2_fsd", "eemcs_fsd", NULL};
+	char *file_list[10] = {"ccci_fsd", NULL};
 	mount_data = real_mount(file->f_path.mnt);
 	if (!memcmp(mount_data->mnt_mountpoint->d_name.name, "data", 5)) {
 		//printk(KERN_ERR "write data detect %s",file->f_path.dentry->d_name.name);
@@ -454,8 +454,7 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 			}
 		}
 	}
-//#ifdef LIMIT_SDCARD_SIZE
-#if 0
+#ifdef LIMIT_SDCARD_SIZE
 	//if(!memcmp(mount_data->mnt_mountpoint->d_name.name, "emulated", 8)){
 	if(!memcmp(file->f_path.mnt->mnt_sb->s_type->name, "fuse", 5)){	
 		store -= count;

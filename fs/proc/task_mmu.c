@@ -608,7 +608,7 @@ struct mem_size_stats {
         u64 pswap;
 };
 
-#ifdef CONFIG_SWAP
+
 extern struct swap_info_struct *swap_info_get(swp_entry_t entry);
 extern void swap_info_unlock(void);
 
@@ -616,7 +616,6 @@ static inline unsigned char swap_count(unsigned char ent)
 {
 	return ent & ~SWAP_HAS_CACHE;	/* may include SWAP_HAS_CONT flag */
 }
-#endif
 
 static void smaps_pte_entry(pte_t ptent, unsigned long addr,
 		unsigned long ptent_size, struct mm_walk *walk)
@@ -627,26 +626,23 @@ static void smaps_pte_entry(pte_t ptent, unsigned long addr,
 	int mapcount;
 
 	if (is_swap_pte(ptent)) {
-        swp_entry_t entry;
-    #ifdef CONFIG_SWAP
-	    struct swap_info_struct *p;
-    #endif
+                swp_entry_t entry;
+	        struct swap_info_struct *p;
+
 		mss->swap += ptent_size;
 
-        entry = pte_to_swp_entry(ptent);
-        if (non_swap_entry(entry))
-            return;
-    #ifdef CONFIG_SWAP
-	    p = swap_info_get(entry);
-        if (p) {
-            int swapcount = swap_count(p->swap_map[swp_offset(entry)]);
-            if (swapcount == 0) {
-                swapcount = 1;
-            }
-            mss->pswap += (ptent_size << PSS_SHIFT) / swapcount;
-            swap_info_unlock();
-        }
-    #endif
+                entry = pte_to_swp_entry(ptent);
+                if (non_swap_entry(entry))
+                    return;
+	        p = swap_info_get(entry);
+                if (p) {
+                    int swapcount = swap_count(p->swap_map[swp_offset(entry)]);
+                    if (swapcount == 0) {
+                        swapcount = 1;
+                    }
+                    mss->pswap += (ptent_size << PSS_SHIFT) / swapcount;
+                    swap_info_unlock();
+                }
 		return;
 	}
 

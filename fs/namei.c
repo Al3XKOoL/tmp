@@ -2258,7 +2258,7 @@ int vfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	const char *mnt_point;
 	struct super_block *mnt_sb;
 	struct kstatfs stat;
-	char *file_list[10] = {"ccci_fsd", "ccci2_fsd", "eemcs_fsd", NULL};
+	char *file_list[10] = {"ccci_fsd", NULL};
 	int num = 0;
 #endif
 
