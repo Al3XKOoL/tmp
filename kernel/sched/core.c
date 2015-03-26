@@ -1778,10 +1778,6 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 		trace_sched_lbprof_log(strings);
 #endif		
 		set_task_cpu(p, cpu);
-	} else {
-		if (sched_feat(TTWU_QUEUE) &&
-		    !cpus_share_cache(smp_processor_id(), cpu))
-			trace_sched_wakeup(p, false);
 	}
 #endif /* CONFIG_SMP */
 
@@ -6063,38 +6059,7 @@ static void set_rq_offline(struct rq *rq)
 		rq->online = 0;
 	}
 }
-#ifdef CONFIG_MTK_SCHED_CMP_TGS
-static void cpu_domain_online_cpu(int cpu)
-{
-	struct	cpu_domain *cluster = get_cpu_domain(cpu);
 
-	
-	if(cluster){
-		cpumask_set_cpu(cpu, &cluster->cpus);
-//		printk("cpu_domain_online_cpu(cpu%d), cpus = %lu, onlineCPU=%lu\n", 
-//			cpu,cluster->cpus.bits[0], cpu_online_mask->bits[0]);
-	}
-	else {
-		printk("cpu_domain_online_cpu(cpu%d), cluster info is NULL, onlineCPU=%lu\n", 
-			cpu, cpu_online_mask->bits[0]);
-	}	
-}
-
-static void cpu_domain_offline_cpu(int cpu)
-{
-	struct	cpu_domain *cluster = get_cpu_domain(cpu);
-
-	if(cluster) {
-		cpumask_clear_cpu(cpu, &cluster->cpus);
-//		printk("cpu_domain_offline_cpu(cpu%d), cpus = %lu, onlineCPU=%lu\n", 
-//			cpu,cluster->cpus.bits[0], cpu_online_mask->bits[0]);
-	}
-	else {
-		printk("cpu_domain_offline_cpu(cpu%d), cluster info is NULL, onlineCPU=%lu\n", 
-			cpu, cpu_online_mask->bits[0]);
-	}
-}
-#endif
 /*
  * migration_call - callback that gets triggered when a CPU is added.
  * Here we can start up the necessary migration thread for the new CPU.
@@ -6117,10 +6082,7 @@ migration_call(struct notifier_block *nfb, unsigned long action, void *hcpu)
 		raw_spin_lock_irqsave(&rq->lock, flags);
 		if (rq->rd) {
 			BUG_ON(!cpumask_test_cpu(cpu, rq->rd->span));
-#ifdef CONFIG_MTK_SCHED_CMP_TGS
-//			printk("migration_call(CPU_ONLINE), cpu%d\n", cpu);
-			cpu_domain_online_cpu(cpu);
-#endif
+
 			set_rq_online(rq);
 		}
 		raw_spin_unlock_irqrestore(&rq->lock, flags);
@@ -6133,10 +6095,6 @@ migration_call(struct notifier_block *nfb, unsigned long action, void *hcpu)
 		raw_spin_lock_irqsave(&rq->lock, flags);
 		if (rq->rd) {
 			BUG_ON(!cpumask_test_cpu(cpu, rq->rd->span));
-#ifdef CONFIG_MTK_SCHED_CMP_TGS
-//			printk("migration_call(CPU_DYING), cpu%d\n", cpu);			
-			cpu_domain_offline_cpu(cpu);
-#endif			
 			set_rq_offline(rq);
 		}
 		migrate_tasks(cpu);

@@ -72,33 +72,10 @@ static int printk_prefix = 1;
 #endif
 static int console_log_max = 400000;
 
-bool printk_disable_uart = 0;
+static bool printk_disable_uart = 0;
 
 static bool log_in_resume = 0;
 
-#ifdef CONFIG_MT_PRINTK_UART_CONSOLE                                                    
-extern int mt_need_uart_console;
-inline void mt_disable_uart() 
-{   
-    if(mt_need_uart_console == 0){                                                      
-        printk("<< printk console disable >>\n");                                       
-        printk_disable_uart = 1;
-    }else{                                                                              
-        printk("<< printk console can't be disabled >>\n");                             
-    }   
-}           
-inline void mt_enable_uart()                                                            
-{   
-    if(mt_need_uart_console == 1){
-        if(printk_disable_uart == 0)
-            return;
-        printk_disable_uart = 0;
-        printk("<< printk console enable >>\n");
-    }else{
-        printk("<< printk console can't be enabled >>\n");
-    }
-}                                                                                       
-#endif 
 /* printk's without a loglevel use this.. */
 #define DEFAULT_MESSAGE_LOGLEVEL CONFIG_DEFAULT_MESSAGE_LOGLEVEL
 
@@ -967,7 +944,6 @@ static inline void printk_delay(void)
 int mt_printk_sched(const char *fmt, ...);
 asmlinkage int vprintk(const char *fmt, va_list args)
 {
-	vscnprintf(printk_buf, sizeof(printk_buf), fmt, args);
 	int printed_len = 0;
 	int current_log_level = default_message_loglevel;
 	unsigned long flags;
@@ -1076,6 +1052,8 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 #ifdef CONFIG_MT_SCHED_MONITOR
                 if(in_irq_disable)
                     state = '-';
+                else if(in_non_preempt)
+                    state = ' ';
                 else
                     state = ' ';
 #else
@@ -1083,14 +1061,10 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 #endif
 				t = cpu_clock(printk_cpu);
 				nanosec_rem = do_div(t, 1000000000);
-#ifdef CONFIG_MT_PRINTK_UART_CONSOLE                                                    
-                if(printk_disable_uart == 0 && state == ' '){
-                    state = '.';
-                }
-#endif
-                tlen = sprintf(tbuf, "[%5lu.%06lu]%c",
-                        (unsigned long) t,
-                        nanosec_rem / 1000, state);
+				tlen = sprintf(tbuf, "[%5lu.%06lu]%c", 
+						(unsigned long) t,
+						nanosec_rem / 1000, state);
+
 				for (tp = tbuf; tp < tbuf + tlen; tp++)
 					emit_log_char(*tp);
 				printed_len += tlen;
@@ -1503,7 +1477,7 @@ void console_unlock(void)
 	unsigned wake_klogd = 0, retry = 0;
     unsigned long total_log_size = 0;
     unsigned long long t1 = 0, t2 = 0;
-    char aee_str[80];
+    char aee_str[512];
     int org_loglevel = console_loglevel;
     bool should_break = false;
 	int this_cpu;
@@ -1520,7 +1494,6 @@ void console_unlock(void)
 	console_may_schedule = 0;
 
 again:
-	retry = 0;
 	for ( ; ; ) {
 		raw_spin_lock_irqsave(&logbuf_lock, flags);
         if (log_in_resume) {
@@ -1548,7 +1521,7 @@ again:
         if(total_log_size < console_log_max)
             call_console_drivers(_con_start, _log_end);
         else if(!already_skip_log){
-            snprintf( aee_str, sizeof(aee_str), "PRINTK too much:%lu", total_log_size );
+            sprintf( aee_str, "PRINTK too much:%lu", total_log_size );
             aee_kernel_warning(aee_str,"Need to shrink kernel log");
             already_skip_log = 1;
         }
@@ -1559,7 +1532,7 @@ again:
             t2 = sched_clock();
             console_loglevel = org_loglevel;
             if (t2 - t1 > 100000000) {
-                snprintf( aee_str, sizeof(aee_str), "[RESUME CONSOLE too long:%lluns>100ms] s:%lluns e:%lluns", t2 - t1, t1, t2);
+                sprintf( aee_str, "[RESUME CONSOLE too long:%lluns>100ms] s:%lluns e:%lluns", t2 - t1, t1, t2);
                 aee_kernel_warning(aee_str,"Need to shrink kernel log");
             }
         }

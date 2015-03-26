@@ -1041,7 +1041,7 @@ static int sched_rt_runtime_exceeded(struct rt_rq *rt_rq)
 		printk_sched("sched: cpu=%d rt_time %llu <-> runtime"
 			     " [%llu -> %llu], exec_delta_time[%llu]"
 			     ", clock_task[%llu], exec_start[%llu]\n",
-			     cpu, rt_rq->rt_time, runtime_pre, runtime, 
+			     cpu, rt_rq->rt_time, runtime_pre, runtime,
 			     per_cpu(exec_delta_time, cpu),
 			     per_cpu(clock_task, cpu),
 			     per_cpu(exec_start, cpu));
@@ -1212,18 +1212,8 @@ inc_rt_group(struct sched_rt_entity *rt_se, struct rt_rq *rt_rq)
 	if (rt_se_boosted(rt_se))
 		rt_rq->rt_nr_boosted++;
 
-	if (rt_rq->tg) {
-		/*
-		 * if @rt_se is a group entity, it's no need to queue
-		 * unnecessary timer while throttled; this also helps
-		 * avoid potential circular dead lock at the same time.
-		 */
-		struct rt_rq *group_rq = group_rt_rq(rt_se);
-		if (group_rq && (rt_rq_throttled(group_rq)))
-			return;
-
+	if (rt_rq->tg)
 		start_rt_bandwidth(&rt_rq->tg->rt_bandwidth);
-	}
 }
 
 static void

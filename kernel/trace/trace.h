@@ -861,4 +861,10 @@ int perf_ftrace_event_register(struct ftrace_event_call *call,
 #define perf_ftrace_event_register NULL
 #endif
 
+void set_tracer_flags(unsigned int mask, int enabled);
+
+#ifdef CONFIG_MTK_SCHED_TRACERS
+void print_enabled_events(struct seq_file *m);
+#endif
+
 #endif /* _LINUX_KERNEL_TRACE_H */

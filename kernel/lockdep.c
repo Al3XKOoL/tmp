@@ -71,8 +71,9 @@ module_param(lock_stat, int, 0644);
 static void lockdep_aee(void)
 {
     char aee_str[40];
-    snprintf( aee_str, 40, "[%s]LockProve Warning", current->comm);
-    aee_kernel_warning_api(__FILE__, __LINE__, DB_OPT_DUMMY_DUMP | DB_OPT_FTRACE, aee_str,"LockProve Debug\n");
+    sprintf( aee_str, "[%s]LockProve Warning", current->comm);
+    aee_kernel_warning( aee_str,"LockProve Debug\n");
+
 }
 /*
  * lockdep_lock: protects the lockdep graph, the hashes and the
@@ -742,9 +743,9 @@ register_lock_class(struct lockdep_map *lock, unsigned int subclass, int force)
  	 */
 	if (!static_obj(lock->key)) {
 		debug_locks_off();
-		printk(KERN_EMERG"INFO: trying to register non-static key.\n");
-		printk(KERN_EMERG"the code is fine but needs lockdep annotation.\n");
-		printk(KERN_EMERG"turning off the locking correctness validator.\n");
+		printk("INFO: trying to register non-static key.\n");
+		printk("the code is fine but needs lockdep annotation.\n");
+		printk("turning off the locking correctness validator.\n");
 		dump_stack();
 
 		return NULL;
@@ -3233,6 +3234,8 @@ static int check_unlock(struct task_struct *curr, struct lockdep_map *lock,
 {
 	if (unlikely(!debug_locks))
 		return 0;
+    if (!lock->in_checking)
+        return 0;
 	/*
 	 * Lockdep should run with IRQs disabled, recursion, head-ache, etc..
 	 */
@@ -3580,8 +3583,11 @@ void lock_acquire(struct lockdep_map *lock, unsigned int subclass,
 	if (unlikely(current->lockdep_recursion))
 		return;
 
-	if (unlikely(lock->skip==1))
+	if (unlikely(!debug_locks)){
+        lock->in_checking = 0;
 		return;
+    }else
+        lock->in_checking = 1;
 
 	raw_local_irq_save(flags);
 	check_flags(flags);
@@ -3601,9 +3607,6 @@ void lock_release(struct lockdep_map *lock, int nested,
 	unsigned long flags;
 
 	if (unlikely(current->lockdep_recursion))
-		return;
-
-	if (unlikely(lock->skip==1))
 		return;
 
 	raw_local_irq_save(flags);

@@ -2720,16 +2720,6 @@ static bool __cancel_work_timer(struct work_struct *work,
 	return ret;
 }
 
-void grab_pending_work(struct work_struct *work)
-{
-	int ret;
-
-	do {
-		ret = try_to_grab_pending(work);
-		wait_on_work(work);
-	} while (unlikely(ret < 0));
-}
-
 /**
  * cancel_work_sync - cancel a work and wait for it to finish
  * @work: the work to cancel
