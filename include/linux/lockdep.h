@@ -155,8 +155,8 @@ struct lockdep_map {
 	int				cpu;
 	unsigned long			ip;
 #endif
-    //skip lockdep if we need it
-    int skip;
+    //add for dynamic ProveLocking
+    int in_checking;
 };
 
 /*
@@ -263,10 +263,6 @@ extern void lockdep_on(void);
 extern void lockdep_init_map(struct lockdep_map *lock, const char *name,
 			     struct lock_class_key *key, int subclass);
 
-static inline void lockdep_skip_validate(struct lockdep_map *lock)
-{
-	lock->skip = 1;
-}
 /*
  * To initialize a lockdep_map statically use this macro.
  * Note that _name must not be NULL.
@@ -360,9 +356,7 @@ static inline void lockdep_off(void)
 static inline void lockdep_on(void)
 {
 }
-static inline void lockdep_skip_validate(struct lockdep_map *lock)
-{
-}
+
 # define lock_acquire(l, s, t, r, c, n, i)	do { } while (0)
 # define lock_release(l, n, i)			do { } while (0)
 # define lock_set_class(l, n, k, s, i)		do { } while (0)

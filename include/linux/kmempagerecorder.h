@@ -1,3 +1,17 @@
+/*
+* Copyright (C) 2011-2014 MediaTek Inc.
+* 
+* This program is free software: you can redistribute it and/or modify it under the terms of the 
+* GNU General Public License version 2 as published by the Free Software Foundation.
+* 
+* This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+* without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+* See the GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License along with this program.
+* If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #ifndef KMEMPAGERECORDER
 #include <linux/types.h>
 #define OBJECT_TABLE_SIZE      1543
@@ -38,11 +52,11 @@ typedef struct
     PageObjectEntry* slots[OBJECT_TABLE_SIZE];
 }PageObjectTable,*PPageObjectTable;
 
-typedef struct page_BT
+typedef struct BT
 {
     unsigned int numEntries;
     void * backtrace[0];
-}page_BT, *page_PBT;
+}BT, *PBT;
 
 // for page
 typedef struct PageHashEntry
@@ -53,7 +67,7 @@ typedef struct PageHashEntry
         struct PageHashEntry *next;
 	PPageObjectEntry allocate_map_entry;
         PPageObjectEntry bt_entry;
-        page_PBT free_bt;
+        PBT free_bt;
         unsigned int flag;
 }PageHashEntry, *PPageHashEntry;
 

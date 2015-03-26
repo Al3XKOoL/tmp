@@ -30,10 +30,6 @@ struct vm_area_struct;
 #define ___GFP_HARDWALL		0x20000u
 #define ___GFP_THISNODE		0x40000u
 #define ___GFP_RECLAIMABLE	0x80000u
-
-/* for PASR */
-#define GFP_NO_MTKPASR		0x100000u
-
 #ifdef CONFIG_KMEMCHECK
 #define ___GFP_NOTRACK		0x200000u
 #else
@@ -43,9 +39,6 @@ struct vm_area_struct;
 #define ___GFP_OTHER_NODE	0x800000u
 #define ___GFP_WRITE		0x1000000u
 #define ___GFP_SLOWHIGHMEM	0x2000000u
-
-/* for PASR */
-#define GFP_MTKPASR_HIGHUSER	0x4000000u
 
 /*
  * GFP bitmasks..
@@ -104,7 +97,7 @@ struct vm_area_struct;
  */
 #define __GFP_NOTRACK_FALSE_POSITIVE (__GFP_NOTRACK)
 
-#define __GFP_BITS_SHIFT 27	/* Room for N __GFP_FOO bits */
+#define __GFP_BITS_SHIFT 26	/* Room for N __GFP_FOO bits */
 #define __GFP_BITS_MASK ((__force gfp_t)((1 << __GFP_BITS_SHIFT) - 1))
 
 /* This equals 0, but use constants in case they ever change */
@@ -165,12 +158,6 @@ static inline int allocflags_to_migratetype(gfp_t gfp_flags)
 
 	if (unlikely(page_group_by_mobility_disabled))
 		return MIGRATE_UNMOVABLE;
-
-#ifdef CONFIG_MTKPASR
-	/* This is the mobility for MTKPASR-imposed pages */
-	if (gfp_flags & GFP_MTKPASR_HIGHUSER)
-		return MIGRATE_MTKPASR; 
-#endif
 
 	/* Group based on mobility */
 	return (((gfp_flags & __GFP_MOVABLE) != 0) << 1) |
@@ -353,13 +340,8 @@ extern struct page *alloc_pages_vma(gfp_t gfp_mask, int order,
 
 #define alloc_pages(gfp_mask, order) \
 		alloc_pages_node(numa_node_id(), gfp_mask, order)
-#ifndef CONFIG_MTKPASR
 #define alloc_pages_vma(gfp_mask, order, vma, addr, node)	\
-	alloc_pages(gfp_mask, order);
-#else
-#define alloc_pages_vma(gfp_mask, order, vma, addr, node)	\
-	alloc_pages(gfp_mask|GFP_MTKPASR_HIGHUSER, order)
-#endif
+	alloc_pages(gfp_mask, order)
 
 #else // CONFIG_MTK_PAGERECORDER
 static inline struct page *
@@ -378,13 +360,8 @@ alloc_pages(gfp_t gfp_mask, unsigned int order)
 	return tmp_page;
 }
 
-#ifndef CONFIG_MTKPASR
 #define alloc_pages_vma(gfp_mask, order, vma, addr, node)	\
 		alloc_pages_nopagedebug(gfp_mask, order)
-#else
-#define alloc_pages_vma(gfp_mask, order, vma, addr, node)	\
-		alloc_pages_nopagedebug(gfp_mask|GFP_MTKPASR_HIGHUSER, order)
-#endif
 
 #define alloc_pages_nopagedebug(gfp_mask, order) \
 		alloc_pages_node(numa_node_id(), gfp_mask, order)

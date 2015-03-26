@@ -1318,7 +1318,7 @@ enum perf_event_task_context {
 };
 
 #ifdef CONFIG_MTK_SCHED_CMP_TGS
-#define MAX_NUM_CLUSTER 2
+#define NUM_CLUSTER 2
 struct thread_group_info_t {
 	/* # of cfs threas in the thread group per cluster*/
 	unsigned long cfs_nr_running; 
@@ -1469,7 +1469,7 @@ struct task_struct {
 
 #ifdef CONFIG_MTK_SCHED_CMP_TGS
 	raw_spinlock_t thread_group_info_lock;
-	struct thread_group_info_t thread_group_info[MAX_NUM_CLUSTER];
+	struct thread_group_info_t thread_group_info[NUM_CLUSTER];
 #endif
 
 	/*
@@ -1548,8 +1548,6 @@ struct task_struct {
 	int (*notifier)(void *priv);
 	void *notifier_data;
 	sigset_t *notifier_mask;
-    struct hlist_head task_works;
-
 	struct audit_context *audit_context;
 #ifdef CONFIG_AUDITSYSCALL
 	uid_t loginuid;
@@ -1928,9 +1926,6 @@ extern int task_free_unregister(struct notifier_block *n);
 #define PF_FROZEN	0x00010000	/* frozen for system suspend */
 #define PF_FSTRANS	0x00020000	/* inside a filesystem transaction */
 #define PF_KSWAPD	0x00040000	/* I am kswapd */
-#ifdef CONFIG_MTKPASR
-#define PF_MTKPASR	0x00080000	/* I am in MTKPASR process */
-#endif
 #define PF_LESS_THROTTLE 0x00100000	/* Throttle me less: I clean memory */
 #define PF_KTHREAD	0x00200000	/* I am a kernel thread */
 #define PF_RANDOMIZE	0x00400000	/* randomize virtual address space */

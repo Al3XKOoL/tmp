@@ -37,8 +37,8 @@ struct bsg_job;
 #define BLKDEV_MAX_RQ	128	/* Default maximum */
 
 //enable storage pid log in user load
-#if !defined(FEATURE_STORAGE_PERF_INDEX) && !defined(USER_BUILD_KERNEL)
-//#if !defined(FEATURE_STORAGE_PERF_INDEX)
+//#if !defined(FEATURE_STORAGE_PERF_INDEX) && !defined(USER_BUILD_KERNEL)
+#if !defined(FEATURE_STORAGE_PERF_INDEX)
 enum METADATA_OPERATION_MODE {
 	WAIT_READ_CNT	= 0,
 	NOWAIT_READ_CNT,
@@ -83,8 +83,8 @@ static inline void clear_metadata_rw_status(int mmc_index)
 
 
 //enable storage pid log in user load
-#if !defined(FEATURE_STORAGE_PID_LOGGER) && !defined(USER_BUILD_KERNEL)
-//#if !defined(FEATURE_STORAGE_PID_LOGGER)
+//#if !defined(FEATURE_STORAGE_PID_LOGGER) && !defined(USER_BUILD_KERNEL)
+#if !defined(FEATURE_STORAGE_PID_LOGGER)
 #define FEATURE_STORAGE_PID_LOGGER
 struct page_pid_logger {
         unsigned short pid1;
